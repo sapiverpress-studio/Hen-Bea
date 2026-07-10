@@ -9,12 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-      - name: Install Hugging Face CLI
-        run: pip install -U huggingface_hub
-
-      - name: Upload app files to existing Space
+      - name: Push GitHub main to existing Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          hf upload sapiverpress/hen-bea-generator . . --repo-type space --exclude '.git*' --exclude '.github*' --commit-message 'Sync from GitHub'
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add hf "https://sapiverpress:${HF_TOKEN}@huggingface.co/spaces/sapiverpress/hen-bea-generator"
+          git push --force hf main
