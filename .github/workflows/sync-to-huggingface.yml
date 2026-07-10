@@ -3,13 +3,18 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: huggingface/hub-sync@v0.1.0
-        with:
-          github_repo_id: ${{ github.repository }}
-          huggingface_repo_id: sapiverpress/hen-bea-generator
-          hf_token: ${{ secrets.HF_TOKEN }}
+
+      - name: Install Hugging Face CLI
+        run: pip install -U huggingface_hub
+
+      - name: Upload app files to existing Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          hf upload sapiverpress/hen-bea-generator . . --repo-type space --exclude '.git*' --exclude '.github*' --commit-message 'Sync from GitHub'
