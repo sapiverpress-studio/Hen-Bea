@@ -1,0 +1,44 @@
+name: Hen & Bea Image-to-Video Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      scene_id:
+        description: Scene ID from prompts/scenes.json
+        required: true
+        default: swings_001
+
+jobs:
+  build-scene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install gradio_client requests
+
+      - name: Run Hen & Bea pipeline
+        env:
+          HF_SPACE_ID: sapiverpress/hen-bea-generator
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          PIAPI_API_KEY: ${{ secrets.PIAPI_API_KEY }}
+        run: |
+          python scripts/run_pipeline.py --scene-id "${{ github.event.inputs.scene_id }}"
+
+      - name: Upload generated outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hen-bea-${{ github.event.inputs.scene_id }}
+          path: output/
+          if-no-files-found: warn
