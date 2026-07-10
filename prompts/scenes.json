@@ -1,0 +1,17 @@
+[
+  {
+    "scene_id": "swings_001",
+    "title": "Hen and Bea playing on the swings",
+    "image_prompt": "HNBEA_HEN, HNBEA_BEA, HNBEA_HEN is a young boy with short brown hair and round glasses wearing a green jumper and dark shorts, HNBEA_BEA is a young girl with blonde hair and a large blue bow wearing an orange shirt and teal dungarees, Hen is seated on the left swing and Bea is seated on the right swing, the two swings hang side by side from one clearly visible playground swing frame, both children hold the chains with both hands, Hen's swing is slightly forward and Bea's swing is slightly behind so the composition already suggests alternating motion, Hen leans back a little with his knees bent and feet ready to extend, Bea leans forward slightly with her legs beginning to stretch, both look toward each other with excited smiles, leave clear empty space in front of and behind both swings for the next movement, keep every hand separated from the body and every limb clearly readable, show the full swing seats, chains, top bar and supporting legs, simple open playground background with soft trees and no clutter, landscape animation-ready keyframe, children's book illustration, flat colour, clean outlines, warm soft palette",
+    "video_prompt": "Hen is the boy on the left with short brown hair, round glasses, a green jumper and dark shorts. Bea is the girl on the right with blonde hair, a large blue bow, an orange shirt and teal dungarees. Animate the existing swing motion naturally. Hen moves forward first while extending his lower legs, then drifts back and bends his knees. Bea follows half a beat behind, moving forward as Hen moves back. Both keep both hands securely on the chains. Hen glances toward Bea and laughs. Bea looks back and smiles brightly. Add subtle body lean, gentle hair and bow movement and a light breeze in the trees. Preserve the exact faces, glasses, bow, clothing, colours, proportions and flat children's-book style. Keep both children, both seats and the full swing frame visible from start to finish. Locked camera. No zoom. No cropping. No morphing. No extra limbs or fingers. No new objects or characters. No scene change.",
+    "lora_strength": 0.9,
+    "steps": 9,
+    "width": 768,
+    "height": 768,
+    "seed": -1,
+    "video_model": "v2.3-fast",
+    "duration": 6,
+    "resolution": 768,
+    "expand_prompt": true
+  }
+]
