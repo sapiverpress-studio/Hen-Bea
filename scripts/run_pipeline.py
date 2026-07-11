@@ -6,6 +6,7 @@ import shutil
 import sys
 import time
 from pathlib import Path
+from urllib.parse import quote
 
 import requests
 from gradio_client import Client
@@ -70,7 +71,46 @@ def generate_image(scene):
     return destination, result
 
 
-def upload_image_to_piapi(image_path: Path):
+def upload_image_to_github(image_path: Path, scene_id: str):
+    token = os.getenv("GITHUB_TOKEN")
+    repository = os.getenv("GITHUB_REPOSITORY")
+    if not token or not repository:
+        raise RuntimeError("GitHub upload fallback needs GITHUB_TOKEN and GITHUB_REPOSITORY")
+
+    timestamp = int(time.time())
+    repo_path = f"generated-inputs/{scene_id}-{timestamp}.png"
+    api_url = f"https://api.github.com/repos/{repository}/contents/{quote(repo_path)}"
+    encoded = base64.b64encode(image_path.read_bytes()).decode("utf-8")
+
+    response = requests.put(
+        api_url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        json={
+            "message": f"Store generated input for {scene_id}",
+            "content": encoded,
+            "branch": "main",
+        },
+        timeout=120,
+    )
+    if not response.ok:
+        raise RuntimeError(
+            f"GitHub fallback upload failed ({response.status_code}): {response.text}"
+        )
+
+    raw_url = f"https://raw.githubusercontent.com/{repository}/main/{repo_path}"
+    for _ in range(12):
+        check = requests.get(raw_url, timeout=30)
+        if check.ok and check.content:
+            return raw_url
+        time.sleep(5)
+    raise RuntimeError(f"Uploaded image but raw URL did not become available: {raw_url}")
+
+
+def upload_image(image_path: Path, scene_id: str):
     encoded = base64.b64encode(image_path.read_bytes()).decode("utf-8")
     response = requests.post(
         "https://upload.theapi.app/api/ephemeral_resource",
@@ -84,12 +124,18 @@ def upload_image_to_piapi(image_path: Path):
         },
         timeout=120,
     )
-    response.raise_for_status()
-    payload = response.json()
-    try:
-        return payload["data"]["url"]
-    except (KeyError, TypeError) as exc:
-        raise RuntimeError(f"Unexpected upload response: {payload}") from exc
+
+    if response.ok:
+        payload = response.json()
+        try:
+            return payload["data"]["url"], "piapi"
+        except (KeyError, TypeError) as exc:
+            raise RuntimeError(f"Unexpected PiAPI upload response: {payload}") from exc
+
+    print(
+        f"PiAPI upload unavailable ({response.status_code}); using GitHub public asset fallback."
+    )
+    return upload_image_to_github(image_path, scene_id), "github"
 
 
 def create_hailuo_task(scene, image_url: str):
@@ -116,7 +162,10 @@ def create_hailuo_task(scene, image_url: str):
         json=payload,
         timeout=120,
     )
-    response.raise_for_status()
+    if not response.ok:
+        raise RuntimeError(
+            f"PiAPI task creation failed ({response.status_code}): {response.text}"
+        )
     body = response.json()
     task_id = body.get("data", {}).get("task_id") or body.get("task_id")
     if not task_id:
@@ -146,7 +195,10 @@ def poll_hailuo_task(task_id: str):
             raise RuntimeError(json.dumps(last, indent=2))
         time.sleep(interval)
 
-    raise TimeoutError(f"Timed out waiting for {task_id}: {json.dumps(last, indent=2) if last else 'no response'}")
+    raise TimeoutError(
+        f"Timed out waiting for {task_id}: "
+        f"{json.dumps(last, indent=2) if last else 'no response'}"
+    )
 
 
 def download_video(task_response, scene_id: str):
@@ -180,8 +232,8 @@ def main():
     image_path, hf_result = generate_image(scene)
     print(f"Image saved: {image_path}")
 
-    image_url = upload_image_to_piapi(image_path)
-    print(f"Image uploaded: {image_url}")
+    image_url, image_host = upload_image(image_path, scene["scene_id"])
+    print(f"Image available through {image_host}: {image_url}")
 
     task_id, creation_response = create_hailuo_task(scene, image_url)
     print(f"Hailuo task created: {task_id}")
@@ -197,6 +249,7 @@ def main():
                 "scene": scene,
                 "image_path": str(image_path),
                 "image_url": image_url,
+                "image_host": image_host,
                 "task_id": task_id,
                 "video_path": str(video_path),
                 "video_url": video_url,
