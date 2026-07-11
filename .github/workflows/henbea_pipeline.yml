@@ -6,7 +6,7 @@ on:
       scene_id:
         description: Scene ID from prompts/scenes.json
         required: true
-        default: classroom_pulse_001
+        default: classroom_drum_001
 
 permissions:
   contents: write
