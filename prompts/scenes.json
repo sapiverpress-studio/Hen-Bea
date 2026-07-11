@@ -9,7 +9,7 @@
     "width": 768,
     "height": 768,
     "seed": -1,
-    "video_model": "v2.3-fast",
+    "video_model": "v2.3",
     "duration": 6,
     "resolution": 768,
     "expand_prompt": true
