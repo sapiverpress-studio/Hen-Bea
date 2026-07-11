@@ -13,5 +13,20 @@
     "duration": 6,
     "resolution": 768,
     "expand_prompt": true
+  },
+  {
+    "scene_id": "classroom_pulse_001",
+    "title": "Hen and Bea clap a steady pulse in the music lesson room",
+    "image_prompt": "HNBEA_HEN, HNBEA_BEA, HNBEA_HEN is a young boy with short brown hair and round glasses wearing a green jumper and dark shorts, HNBEA_BEA is a young girl with blonde hair and a large blue bow wearing an orange shirt and teal dungarees, Hen stands on the left and Bea stands on the right side by side on a simple round classroom rug, both children face slightly toward the centre of the room, both hold their hands clearly apart at chest height ready to clap a steady musical pulse, elbows slightly bent, fingers together, hands fully visible and separated from their bodies, feet planted shoulder-width apart, upright balanced poses, calm cheerful expressions with closed mouths, Hen's exact round glasses remain clearly visible, Bea's large blue bow has a simple fixed symmetrical shape, behind them is a warm uncluttered music lesson room with one upright piano against the wall, one large teaching board showing four simple large beat circles, a low shelf with two large percussion instruments and a few books, no teacher and no other characters, large simple objects only, clear floor space around both children, full bodies visible from head to shoes, centred square animation-ready composition, locked frontal camera, children's book illustration, flat colour, clean outlines, soft warm palette, simple readable shapes, consistent character design, no realistic rendering, no generic clip-art look",
+    "video_prompt": "Hen is the boy on the left with short brown hair, exact round glasses, a green jumper and dark shorts. Bea is the girl on the right with blonde hair, an exact large symmetrical blue bow, an orange shirt and teal dungarees. Animate Hen and Bea clapping a steady four-beat musical pulse together. Begin with their hands apart at chest height. Both bring their palms together for one clear clap, move their hands apart, then repeat at an even tempo for four controlled claps across the full shot. Use small natural elbow and shoulder movement only. Their feet remain planted and their bodies remain upright in the same positions. Keep their heads mostly still and preserve the same calm cheerful closed-mouth expressions throughout. Preserve Hen's exact face and glasses. Preserve Bea's exact face and bow shape. Keep clothing, colours, proportions, hairstyles and flat children's-book illustration style unchanged. Keep the piano, board, rug, shelf and all background objects completely stable. Locked camera. No zoom. No pan. No cropping. No walking. No waving. No talking. No mouth movement. No facial-expression changes. No head turning. No body morphing. No extra limbs or fingers. No new objects or characters. No scene change.",
+    "lora_strength": 0.9,
+    "steps": 9,
+    "width": 768,
+    "height": 768,
+    "seed": -1,
+    "video_model": "v2.3",
+    "duration": 6,
+    "resolution": 768,
+    "expand_prompt": false
   }
 ]
