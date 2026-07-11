@@ -1,0 +1,30 @@
+name: PiAPI Hailuo Diagnostic
+
+on:
+  push:
+    paths:
+      - ".github/workflows/piapi_diagnostic.yml"
+      - "scripts/piapi_diagnostic.py"
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install requests
+      - name: Run direct PiAPI diagnostic
+        env:
+          PIAPI_API_KEY: ${{ secrets.PIAPI_API_KEY }}
+        run: python scripts/piapi_diagnostic.py
+      - name: Upload diagnostic result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: piapi-hailuo-diagnostic
+          path: output/diagnostic/
+          if-no-files-found: warn
