@@ -1,0 +1,16 @@
+{
+  "batch_id": "pilot_batch_01",
+  "purpose": "Validate ten short music-lesson actions before scaling toward the full training library and 15-minute lesson production system.",
+  "scene_ids": [
+    "classroom_pulse_001",
+    "classroom_drum_001",
+    "classroom_maraca_001",
+    "classroom_note_card_001",
+    "classroom_piano_key_001",
+    "classroom_rhythm_sticks_001",
+    "classroom_triangle_001",
+    "classroom_long_short_001",
+    "classroom_high_low_001",
+    "classroom_copy_beat_001"
+  ]
+}
