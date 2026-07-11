@@ -37,7 +37,7 @@ jobs:
           PIAPI_API_KEY: ${{ secrets.PIAPI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python scripts/run_pipeline.py --scene-id "${{ github.event.inputs.scene_id }}"
+          python scripts/run_pipeline_retry.py --scene-id "${{ github.event.inputs.scene_id }}" --video-attempts 4
 
       - name: Upload generated outputs
         if: always()
