@@ -53,24 +53,13 @@ def generate_image(scene):
     args = (
         scene["image_prompt"],
         float(scene.get("lora_strength", 0.9)),
-        int(scene.get("steps", 9)),
         int(scene.get("width", 768)),
         int(scene.get("height", 768)),
+        int(scene.get("steps", 9)),
         int(scene.get("seed", -1)),
     )
 
-    candidates = [name for name in [os.getenv("HF_API_NAME"), "/generate_image", "/predict"] if name]
-    result = None
-    last_error = None
-    for api_name in candidates:
-        try:
-            result = client.predict(*args, api_name=api_name)
-            break
-        except Exception as exc:
-            last_error = exc
-
-    if result is None:
-        raise RuntimeError(f"Hugging Face generation failed: {last_error}")
+    result = client.predict(*args, api_name="/generate")
 
     source = Path(extract_image_path(result))
     if not source.exists():
