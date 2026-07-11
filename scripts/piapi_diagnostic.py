@@ -5,25 +5,22 @@ import time
 import requests
 
 API_KEY = os.environ["PIAPI_API_KEY"]
-IMAGE_URLS = [
-    "https://raw.githubusercontent.com/sapiverpress-studio/Hen-Bea/main/generated-inputs/swings_001-1783752766.png",
-    "https://cdn.jsdelivr.net/gh/sapiverpress-studio/Hen-Bea@main/generated-inputs/swings_001-1783752766.png",
-]
+IMAGE_URL = "https://cdn.jsdelivr.net/gh/sapiverpress-studio/Hen-Bea@main/generated-inputs/swings_001-1783752766.png"
 
 
-def create_task(image_url: str):
+def create_task():
     payload = {
         "model": "hailuo",
         "task_type": "video_generation",
         "input": {
             "prompt": "Two children gently swing back and forth. Keep the camera fixed and preserve the original illustration.",
-            "image_url": image_url,
+            "image_url": IMAGE_URL,
             "model": "v2.3-fast",
             "expand_prompt": False,
             "duration": 6,
             "resolution": 768,
         },
-        "config": {"service_mode": "public"},
+        "config": {"service_mode": "private"},
     }
     response = requests.post(
         "https://api.piapi.ai/api/v1/task",
@@ -31,13 +28,13 @@ def create_task(image_url: str):
         json=payload,
         timeout=120,
     )
-    print("CREATE", image_url, response.status_code, response.text)
+    print("CREATE", response.status_code, response.text)
     response.raise_for_status()
     return response.json()["data"]["task_id"]
 
 
 def poll(task_id: str):
-    for _ in range(40):
+    for _ in range(80):
         response = requests.get(
             f"https://api.piapi.ai/api/v1/task/{task_id}",
             headers={"x-api-key": API_KEY},
@@ -54,22 +51,24 @@ def poll(task_id: str):
 
 
 def main():
-    results = []
-    for image_url in IMAGE_URLS:
-        head = requests.get(image_url, timeout=60)
-        print("IMAGE", image_url, head.status_code, head.headers.get("content-type"), len(head.content))
-        try:
-            task_id = create_task(image_url)
-            result = poll(task_id)
-            results.append({"image_url": image_url, "task_id": task_id, "result": result})
-            if result.get("data", {}).get("status") == "completed":
-                break
-        except Exception as exc:
-            results.append({"image_url": image_url, "error": repr(exc)})
+    image = requests.get(IMAGE_URL, timeout=60)
+    print("IMAGE", image.status_code, image.headers.get("content-type"), len(image.content))
+    result = {"image_url": IMAGE_URL, "service_mode": "private"}
+    try:
+        task_id = create_task()
+        result["task_id"] = task_id
+        result["result"] = poll(task_id)
+    except Exception as exc:
+        result["error"] = repr(exc)
+
     os.makedirs("output/diagnostic", exist_ok=True)
-    with open("output/diagnostic/piapi_diagnostic.json", "w", encoding="utf-8") as handle:
-        json.dump(results, handle, indent=2, default=str)
-    print(json.dumps(results, indent=2, default=str))
+    with open("output/diagnostic/piapi_private_diagnostic.json", "w", encoding="utf-8") as handle:
+        json.dump(result, handle, indent=2, default=str)
+    print(json.dumps(result, indent=2, default=str))
+
+    status = result.get("result", {}).get("data", {}).get("status")
+    if status != "completed":
+        raise SystemExit("Private-mode PiAPI diagnostic did not complete")
 
 
 if __name__ == "__main__":
