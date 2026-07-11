@@ -47,7 +47,7 @@ def extract_image_path(result):
 def generate_image(scene):
     client = Client(
         os.getenv("HF_SPACE_ID", "sapiverpress/hen-bea-generator"),
-        hf_token=os.getenv("HF_TOKEN") or None,
+        token=os.getenv("HF_TOKEN") or None,
     )
 
     args = (
