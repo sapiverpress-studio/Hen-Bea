@@ -30,14 +30,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install gradio_client requests
 
-      - name: Run paid private Hen & Bea pipeline
+      - name: Run paid Hen & Bea pipeline
         env:
           HF_SPACE_ID: sapiverpress/hen-bea-generator
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           PIAPI_API_KEY: ${{ secrets.PIAPI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python scripts/run_pipeline_private.py --scene-id "${{ github.event.inputs.scene_id }}" --video-attempts 2
+          python scripts/run_pipeline_private.py --scene-id "${{ github.event.inputs.scene_id }}" --video-attempts 1
 
       - name: Upload generated outputs
         if: always()
