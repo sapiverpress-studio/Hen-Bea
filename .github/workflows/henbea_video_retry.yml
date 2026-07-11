@@ -1,0 +1,51 @@
+name: Hen & Bea Video-Only Retry
+
+on:
+  workflow_dispatch:
+    inputs:
+      scene_id:
+        description: Scene ID from prompts/scenes.json
+        required: true
+        default: classroom_pulse_001
+      image_url:
+        description: Existing public still image URL
+        required: true
+        default: https://raw.githubusercontent.com/sapiverpress-studio/Hen-Bea/main/generated-inputs/classroom_pulse_001-1783784187.png
+
+permissions:
+  contents: read
+
+jobs:
+  retry-video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Run one paid Hailuo video-only attempt
+        env:
+          PIAPI_API_KEY: ${{ secrets.PIAPI_API_KEY }}
+        run: |
+          python scripts/run_video_only.py \
+            --scene-id "${{ github.event.inputs.scene_id }}" \
+            --image-url "${{ github.event.inputs.image_url }}"
+
+      - name: Upload video and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hen-bea-${{ github.event.inputs.scene_id }}-video-only
+          path: output/
+          if-no-files-found: warn
