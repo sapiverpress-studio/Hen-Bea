@@ -1,28 +1,28 @@
-name: Hen & Bea Ten-Scene Pilot Batch
+name: Hen & Bea Production Sweep 60
 
 on:
   workflow_dispatch:
     inputs:
-      start:
-        description: First scene number in pilot batch (1-10)
+      target_successes:
+        description: Number of successful videos to collect before stopping
         required: true
-        default: "1"
-      end:
-        description: Last scene number in pilot batch (1-10)
+        default: "60"
+      max_attempts:
+        description: Maximum scene attempts allowed in this one-run workflow
         required: true
-        default: "10"
+        default: "90"
       pause_seconds:
-        description: Pause between paid tasks
+        description: Seconds to wait between paid Hailuo tasks
         required: true
-        default: "30"
+        default: "20"
 
 permissions:
   contents: write
 
 jobs:
-  pilot-batch:
+  production-sweep:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 360
 
     steps:
       - name: Checkout repository
@@ -38,23 +38,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install gradio_client requests
 
-      - name: Run selected pilot scenes sequentially
+      - name: Run production sweep sequentially
         env:
           HF_SPACE_ID: sapiverpress/hen-bea-generator
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           PIAPI_API_KEY: ${{ secrets.PIAPI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python scripts/run_pilot_batch.py \
-            --batch-file prompts/pilot_batch_01.json \
-            --start "${{ github.event.inputs.start }}" \
-            --end "${{ github.event.inputs.end }}" \
+          python scripts/run_production_batch.py \
+            --target-successes "${{ github.event.inputs.target_successes }}" \
+            --max-attempts "${{ github.event.inputs.max_attempts }}" \
             --pause-seconds "${{ github.event.inputs.pause_seconds }}"
 
-      - name: Upload pilot outputs and manifest
+      - name: Upload production outputs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hen-bea-pilot-${{ github.event.inputs.start }}-${{ github.event.inputs.end }}
+          name: hen-bea-production-sweep-01
           path: output/
           if-no-files-found: warn
