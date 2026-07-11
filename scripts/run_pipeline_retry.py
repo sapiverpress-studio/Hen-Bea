@@ -1,8 +1,14 @@
 import argparse
 import json
+import sys
 import time
+from pathlib import Path
 
-from scripts import run_pipeline as pipeline
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+import run_pipeline as pipeline
 
 
 def is_transient_piapi_failure(exc: Exception) -> bool:
