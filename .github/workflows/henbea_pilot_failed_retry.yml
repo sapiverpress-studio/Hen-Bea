@@ -1,0 +1,66 @@
+name: Hen & Bea Pilot Failed-Scene Retry
+
+on:
+  workflow_dispatch:
+    inputs:
+      pause_seconds:
+        description: Seconds to wait between paid Hailuo tasks
+        required: true
+        default: "30"
+
+permissions:
+  contents: read
+
+jobs:
+  retry-failed-scenes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests gradio_client
+
+      - name: Retry only the three failed pilot videos
+        env:
+          PIAPI_API_KEY: ${{ secrets.PIAPI_API_KEY }}
+        run: |
+          mkdir -p output/logs output/videos
+          total=$(jq 'length' prompts/pilot_failed_retry_01.json)
+          failures=0
+
+          for index in $(seq 0 $((total - 1))); do
+            scene_id=$(jq -r ".[$index].scene_id" prompts/pilot_failed_retry_01.json)
+            image_url=$(jq -r ".[$index].image_url" prompts/pilot_failed_retry_01.json)
+
+            echo "=== Retry $((index + 1))/$total: $scene_id ==="
+            if ! python scripts/run_video_only.py --scene-id "$scene_id" --image-url "$image_url" \
+              > "output/logs/${scene_id}-retry-console.txt" 2>&1; then
+              failures=$((failures + 1))
+              echo "$scene_id failed; continuing so all targeted scenes are attempted."
+            fi
+
+            if [ "$index" -lt $((total - 1)) ]; then
+              sleep "${{ github.event.inputs.pause_seconds }}"
+            fi
+          done
+
+          echo "Targeted retry finished with $failures failed scene(s)."
+          exit 0
+
+      - name: Upload retry videos and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hen-bea-pilot-failed-retry-01
+          path: output/
+          if-no-files-found: warn
