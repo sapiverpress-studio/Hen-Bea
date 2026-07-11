@@ -27,6 +27,30 @@ def validate_image_url(image_url: str) -> None:
     print(f"Existing still validated: {image_url}")
 
 
+def write_log(scene, image_url, task_id, creation_response, task_response, video_path, video_url, error):
+    log_path = pipeline.LOGS_DIR / f"{scene['scene_id']}-video-only.json"
+    log_path.write_text(
+        json.dumps(
+            {
+                "scene": scene,
+                "mode": "video_only_retry",
+                "service_mode": "public",
+                "image_url": image_url,
+                "task_id": task_id,
+                "video_path": str(video_path) if video_path else None,
+                "video_url": video_url,
+                "creation_response": creation_response,
+                "task_response": task_response,
+                "error": error,
+            },
+            indent=2,
+            default=str,
+        ),
+        encoding="utf-8",
+    )
+    print(f"Log saved: {log_path}")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--scene-id", required=True)
@@ -40,36 +64,35 @@ def main():
         raise SystemExit(f"Unknown scene: {args.scene_id}. Available: {available}")
 
     scene = scenes[args.scene_id]
-    validate_image_url(args.image_url)
+    task_id = None
+    creation_response = None
+    task_response = None
+    video_path = None
+    video_url = None
+    error = None
 
-    print("Starting one paid public Hailuo video-only attempt...")
-    task_id, creation_response = create_paid_hailuo_task(scene, args.image_url)
-    print(f"Hailuo task created: {task_id}")
-
-    task_response = pipeline.poll_hailuo_task(task_id)
-    video_path, video_url = pipeline.download_video(task_response, scene["scene_id"])
-    print(f"Video saved: {video_path}")
-
-    log_path = pipeline.LOGS_DIR / f"{scene['scene_id']}-video-only.json"
-    log_path.write_text(
-        json.dumps(
-            {
-                "scene": scene,
-                "mode": "video_only_retry",
-                "service_mode": "public",
-                "image_url": args.image_url,
-                "task_id": task_id,
-                "video_path": str(video_path),
-                "video_url": video_url,
-                "creation_response": creation_response,
-                "task_response": task_response,
-            },
-            indent=2,
-            default=str,
-        ),
-        encoding="utf-8",
-    )
-    print(f"Log saved: {log_path}")
+    try:
+        validate_image_url(args.image_url)
+        print("Starting one paid public Hailuo video-only attempt...")
+        task_id, creation_response = create_paid_hailuo_task(scene, args.image_url)
+        print(f"Hailuo task created: {task_id}")
+        task_response = pipeline.poll_hailuo_task(task_id)
+        video_path, video_url = pipeline.download_video(task_response, scene["scene_id"])
+        print(f"Video saved: {video_path}")
+    except Exception as exc:
+        error = str(exc)
+        raise
+    finally:
+        write_log(
+            scene,
+            args.image_url,
+            task_id,
+            creation_response,
+            task_response,
+            video_path,
+            video_url,
+            error,
+        )
 
 
 if __name__ == "__main__":
