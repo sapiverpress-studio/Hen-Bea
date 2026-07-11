@@ -7,7 +7,7 @@ import torch
 from diffusers import ZImagePipeline
 from huggingface_hub import HfApi
 
-APP_VERSION = "HB-GITHUB-SOURCE-2026-07-10-1"
+APP_VERSION = "HB-GITHUB-SOURCE-2026-07-11-2"
 BASE_MODEL = "Tongyi-MAI/Z-Image-Turbo"
 LORA_REPO = "sapiverpress/hen-bea-lora"
 HF_TOKEN = os.getenv("HF_TOKEN")
@@ -105,6 +105,7 @@ with gr.Blocks(title="Hen & Bea Generator") as demo:
         fn=generate,
         inputs=[prompt, strength, width, height, steps, seed],
         outputs=[output, used_seed, status],
+        api_name="generate",
     )
 
 
