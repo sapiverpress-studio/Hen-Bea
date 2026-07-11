@@ -28,5 +28,20 @@
     "duration": 6,
     "resolution": 768,
     "expand_prompt": false
+  },
+  {
+    "scene_id": "classroom_drum_001",
+    "title": "Bea taps a steady drum beat while Hen counts",
+    "image_prompt": "HNBEA_HEN, HNBEA_BEA, HNBEA_HEN is a young boy with short brown hair and round glasses wearing a green jumper and dark shorts, HNBEA_BEA is a young girl with blonde hair and a large blue bow wearing an orange shirt and teal dungarees, indoor music lesson room in the same warm Hen and Bea world, Bea stands on the right behind one small round hand drum placed securely on a simple waist-height wooden stand, Bea holds one short drum beater clearly in her right hand raised a little above the centre of the drum, her left hand rests clearly at her side, Hen stands on the left turned slightly toward Bea, Hen raises one clear index finger beside his chest as if counting the beat and keeps his other hand relaxed at his side, both children have planted feet, upright balanced poses and calm cheerful closed-mouth expressions, Hen's exact round glasses remain clearly visible, Bea's large blue bow is simple fixed and symmetrical, show full bodies from head to shoes, hands and drum beater fully separated from clothing and easy to read, one upright piano against the back wall, one large teaching board with four simple large beat circles, one low shelf with a few large books, no teacher, no extra characters, no tiny instruments, no clutter, centred square animation-ready composition, locked frontal camera, children's book illustration, flat colour, clean outlines, soft warm palette, simple readable shapes, consistent character design, no realistic rendering, no generic clip-art look",
+    "video_prompt": "Hen is the boy on the left with short brown hair, exact round glasses, a green jumper and dark shorts. Bea is the girl on the right with blonde hair, an exact large symmetrical blue bow, an orange shirt and teal dungarees. Animate one simple steady four-beat lesson. Bea moves only her right forearm and hand, lowering the single drum beater to tap the exact centre of the drum four times at an even tempo, lifting it a short distance between taps. The beater remains in her right hand throughout. Her left arm stays relaxed and still. Hen keeps his body planted and counts the beat by making four small controlled up-and-down pulses with his already-raised index finger, matching Bea's taps. Keep both heads mostly still, keep mouths closed, and preserve the same calm cheerful expressions. Preserve Hen's exact face and glasses. Preserve Bea's exact face and bow shape. Preserve the drum, beater, clothing, colours, proportions, hairstyles and flat children's-book illustration style. Keep the piano, board, shelf, rug and room completely stable. Locked camera. No zoom. No pan. No cropping. No walking. No talking. No mouth movement. No head turning. No large body movement. No switching hands. No second beater. No drum deformation. No body morphing. No extra limbs or fingers. No new objects or characters. No scene change.",
+    "lora_strength": 0.9,
+    "steps": 9,
+    "width": 768,
+    "height": 768,
+    "seed": -1,
+    "video_model": "v2.3",
+    "duration": 6,
+    "resolution": 768,
+    "expand_prompt": false
   }
 ]
