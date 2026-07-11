@@ -21,11 +21,12 @@ def create_paid_hailuo_task(scene, image_url: str):
         "input": {
             "prompt": scene["video_prompt"],
             "image_url": image_url,
-            "model": scene.get("video_model", "v2.3-fast"),
+            "model": scene.get("video_model", "v2.3"),
             "expand_prompt": bool(scene.get("expand_prompt", True)),
             "duration": int(scene.get("duration", 6)),
             "resolution": int(scene.get("resolution", 768)),
         },
+        "config": {"service_mode": "public"},
     }
     response = requests.post(
         "https://api.piapi.ai/api/v1/task",
@@ -111,7 +112,7 @@ def main():
         json.dumps(
             {
                 "scene": scene,
-                "service_mode": "default",
+                "service_mode": "public",
                 "image_path": str(image_path),
                 "image_url": image_url,
                 "image_host": image_host,
