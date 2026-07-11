@@ -14,7 +14,7 @@ if str(SCRIPT_DIR) not in sys.path:
 import run_pipeline as pipeline
 
 
-def create_private_hailuo_task(scene, image_url: str):
+def create_paid_hailuo_task(scene, image_url: str):
     payload = {
         "model": "hailuo",
         "task_type": "video_generation",
@@ -26,7 +26,6 @@ def create_private_hailuo_task(scene, image_url: str):
             "duration": int(scene.get("duration", 6)),
             "resolution": int(scene.get("resolution", 768)),
         },
-        "config": {"service_mode": "private"},
     }
     response = requests.post(
         "https://api.piapi.ai/api/v1/task",
@@ -39,12 +38,12 @@ def create_private_hailuo_task(scene, image_url: str):
     )
     if not response.ok:
         raise RuntimeError(
-            f"PiAPI private task creation failed ({response.status_code}): {response.text}"
+            f"PiAPI task creation failed ({response.status_code}): {response.text}"
         )
     body = response.json()
     task_id = body.get("data", {}).get("task_id") or body.get("task_id")
     if not task_id:
-        raise RuntimeError(f"Unexpected private task creation response: {body}")
+        raise RuntimeError(f"Unexpected task creation response: {body}")
     return task_id, body
 
 
@@ -67,7 +66,7 @@ def is_transient_failure(exc: Exception) -> bool:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--scene-id", required=True)
-    parser.add_argument("--video-attempts", type=int, default=2)
+    parser.add_argument("--video-attempts", type=int, default=1)
     args = parser.parse_args()
 
     pipeline.ensure_dirs()
@@ -88,10 +87,10 @@ def main():
     failed_task_responses = []
 
     for attempt in range(1, args.video_attempts + 1):
-        print(f"Starting paid private Hailuo attempt {attempt}/{args.video_attempts}...")
-        task_id, creation_response = create_private_hailuo_task(scene, image_url)
+        print(f"Starting paid Hailuo attempt {attempt}/{args.video_attempts}...")
+        task_id, creation_response = create_paid_hailuo_task(scene, image_url)
         creation_responses.append(creation_response)
-        print(f"Private Hailuo task created: {task_id}")
+        print(f"Hailuo task created: {task_id}")
         try:
             task_response = pipeline.poll_hailuo_task(task_id)
             break
@@ -102,7 +101,7 @@ def main():
             time.sleep(45 * attempt)
 
     if task_response is None:
-        raise RuntimeError("No private Hailuo task completed")
+        raise RuntimeError("No Hailuo task completed")
 
     video_path, video_url = pipeline.download_video(task_response, scene["scene_id"])
     print(f"Video saved: {video_path}")
@@ -112,7 +111,7 @@ def main():
         json.dumps(
             {
                 "scene": scene,
-                "service_mode": "private",
+                "service_mode": "default",
                 "image_path": str(image_path),
                 "image_url": image_url,
                 "image_host": image_host,
