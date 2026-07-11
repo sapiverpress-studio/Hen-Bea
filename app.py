@@ -7,7 +7,7 @@ import torch
 from diffusers import ZImagePipeline
 from huggingface_hub import HfApi
 
-APP_VERSION = "HB-GITHUB-SOURCE-2026-07-11-2"
+APP_VERSION = "HB-GITHUB-SOURCE-2026-07-11-3"
 BASE_MODEL = "Tongyi-MAI/Z-Image-Turbo"
 LORA_REPO = "sapiverpress/hen-bea-lora"
 HF_TOKEN = os.getenv("HF_TOKEN")
@@ -38,7 +38,7 @@ def find_lora_file():
     return preferred[0] if preferred else candidates[0]
 
 
-@spaces.GPU(duration=120)
+@spaces.GPU(duration=60)
 def generate(prompt, strength, width, height, steps, seed):
     global pipe, lora_file
 
