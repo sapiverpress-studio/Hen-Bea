@@ -1,0 +1,109 @@
+name: Export Hen & Bea Packs 01-03
+
+on:
+  push:
+    paths:
+      - .github/workflows/export_packs_01_03.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  export-packs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download latest Pack 01, 02 and 03 artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p export_work originals combined_training/videos combined_training/texts combined_training/stills
+
+          for pack in 01 02 03; do
+            name="hen-bea-batch-${pack}"
+            echo "Finding latest artifact named ${name}"
+            artifact_id=$(curl -fsSL \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPOSITORY}/actions/artifacts?name=${name}&per_page=100" \
+              | jq -r '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | reverse | .[0].id // empty')
+
+            if [ -z "${artifact_id}" ]; then
+              echo "No non-expired artifact found for ${name}" >&2
+              exit 1
+            fi
+
+            curl -fsSL -L \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPOSITORY}/actions/artifacts/${artifact_id}/zip" \
+              -o "export_work/${name}.zip"
+
+            mkdir -p "originals/pack_${pack}"
+            unzip -q "export_work/${name}.zip" -d "originals/pack_${pack}"
+
+            if [ -d "originals/pack_${pack}/training_upload/videos" ]; then
+              for file in originals/pack_${pack}/training_upload/videos/*; do
+                [ -f "$file" ] || continue
+                cp "$file" "combined_training/videos/pack_${pack}__$(basename "$file")"
+              done
+            fi
+            if [ -d "originals/pack_${pack}/training_upload/texts" ]; then
+              for file in originals/pack_${pack}/training_upload/texts/*; do
+                [ -f "$file" ] || continue
+                cp "$file" "combined_training/texts/pack_${pack}__$(basename "$file")"
+              done
+            fi
+            if [ -d "originals/pack_${pack}/training_upload/stills" ]; then
+              for file in originals/pack_${pack}/training_upload/stills/*; do
+                [ -f "$file" ] || continue
+                cp "$file" "combined_training/stills/pack_${pack}__$(basename "$file")"
+              done
+            fi
+          done
+
+          cat > README_PACKS_01_03.txt <<'EOF'
+          HEN & BEA PACKS 01-03 COMBINED EXPORT
+
+          originals/ contains the complete extracted GitHub Actions artifact for each pack.
+          combined_training/ contains renamed MP4, TXT and still-image files from all three packs without filename collisions.
+
+          TXT files are generation-caption drafts. They must be checked against the actual footage and corrected before model training.
+          EOF
+
+          mkdir -p exports
+          rm -f exports/hen-bea-packs-01-03-combined.zip
+          zip -qr exports/hen-bea-packs-01-03-combined.zip originals combined_training README_PACKS_01_03.txt
+
+          echo "Videos: $(find combined_training/videos -type f | wc -l)"
+          echo "Texts: $(find combined_training/texts -type f | wc -l)"
+          echo "Stills: $(find combined_training/stills -type f | wc -l)"
+          ls -lh exports/hen-bea-packs-01-03-combined.zip
+
+      - name: Commit combined export
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add exports/hen-bea-packs-01-03-combined.zip
+          if git diff --cached --quiet; then
+            echo "Combined export is unchanged."
+          else
+            git commit -m "Export Hen and Bea packs 01 to 03"
+            git push
+          fi
+
+      - name: Upload combined export artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hen-bea-packs-01-03-combined
+          path: exports/hen-bea-packs-01-03-combined.zip
+          if-no-files-found: error
