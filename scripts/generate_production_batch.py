@@ -171,8 +171,11 @@ DESC = {
 
 def build_scenes():
     scenes = []
-    for action in ACTIONS:
-        for variant_number, layout in enumerate(LAYOUTS, start=1):
+    for batch_index in range(len(LAYOUTS)):
+        for action_index, action in enumerate(ACTIONS):
+            layout_index = (batch_index + action_index) % len(LAYOUTS)
+            layout = LAYOUTS[layout_index]
+            variant_number = layout_index + 1
             lead = layout["lead"]
             follow = layout["follow"]
             action_image = action["image"].format(lead=lead, follow=follow)
@@ -194,6 +197,7 @@ def build_scenes():
                 "scene_id": f"prod_{action['key']}_{variant_number:02d}",
                 "title": f"{action['title']} — {layout['name'].replace('_', ' ')}",
                 "variation": {
+                    "batch_group": batch_index + 1,
                     "room_zone": layout["zone"],
                     "posture": layout["pose"],
                     "framing": layout["camera"],
