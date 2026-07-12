@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - .github/workflows/export_packs_01_03.yml
+      - .github/export_packs.trigger
   workflow_dispatch:
 
 permissions:
