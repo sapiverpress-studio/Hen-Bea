@@ -1,28 +1,40 @@
-name: Hen & Bea Production Sweep 60
+name: Hen & Bea Production Batch 10
 
 on:
   workflow_dispatch:
     inputs:
-      target_successes:
-        description: Number of successful videos to collect before stopping
+      batch_number:
+        description: Batch label for artifact naming
         required: true
-        default: "60"
-      max_attempts:
-        description: Maximum scene attempts allowed in this one-run workflow
+        default: "01"
+      start_index:
+        description: 1-based starting scene index
         required: true
-        default: "90"
+        default: "1"
+      attempt_count:
+        description: Number of scene attempts in this batch
+        required: true
+        default: "10"
       pause_seconds:
         description: Seconds to wait between paid Hailuo tasks
         required: true
         default: "20"
+      stop_after_total_failures:
+        description: Stop after this many total failures
+        required: true
+        default: "5"
+      stop_after_consecutive_failures:
+        description: Stop after this many consecutive failures
+        required: true
+        default: "3"
 
 permissions:
   contents: write
 
 jobs:
-  production-sweep:
+  production-batch:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 180
 
     steps:
       - name: Checkout repository
@@ -38,7 +50,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install gradio_client requests
 
-      - name: Run production sweep sequentially
+      - name: Run ten-scene production batch
         env:
           HF_SPACE_ID: sapiverpress/hen-bea-generator
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -46,14 +58,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python scripts/run_production_batch.py \
-            --target-successes "${{ github.event.inputs.target_successes }}" \
-            --max-attempts "${{ github.event.inputs.max_attempts }}" \
-            --pause-seconds "${{ github.event.inputs.pause_seconds }}"
+            --start-index "${{ github.event.inputs.start_index }}" \
+            --attempt-count "${{ github.event.inputs.attempt_count }}" \
+            --pause-seconds "${{ github.event.inputs.pause_seconds }}" \
+            --stop-after-total-failures "${{ github.event.inputs.stop_after_total_failures }}" \
+            --stop-after-consecutive-failures "${{ github.event.inputs.stop_after_consecutive_failures }}" \
+            --output-tag "batch_${{ github.event.inputs.batch_number }}"
 
-      - name: Upload production outputs
+      - name: Upload batch outputs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hen-bea-production-sweep-01
+          name: hen-bea-batch-${{ github.event.inputs.batch_number }}
           path: output/
           if-no-files-found: warn
