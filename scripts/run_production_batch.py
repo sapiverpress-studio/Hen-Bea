@@ -24,43 +24,27 @@ TRAINING_TEXTS_DIR = TRAINING_DIR / "texts"
 TRAINING_STILLS_DIR = TRAINING_DIR / "stills"
 
 
-def ensure_all_dirs():
+def ensure_dirs():
     pipeline.ensure_dirs()
-    for directory in (
-        MANIFESTS_DIR,
-        TRAINING_DIR,
-        TRAINING_VIDEOS_DIR,
-        TRAINING_TEXTS_DIR,
-        TRAINING_STILLS_DIR,
-    ):
+    for directory in (MANIFESTS_DIR, TRAINING_VIDEOS_DIR, TRAINING_TEXTS_DIR, TRAINING_STILLS_DIR):
         directory.mkdir(parents=True, exist_ok=True)
 
 
 def save_manifest(rows, json_path, csv_path):
     json_path.write_text(json.dumps(rows, indent=2, default=str), encoding="utf-8")
-    fieldnames = [
-        "scene_id",
-        "title",
-        "status",
-        "attempt_number",
-        "quality_tier",
-        "training_caption_draft",
-        "image_path",
-        "image_url",
-        "image_host",
-        "video_path",
-        "video_url",
-        "text_path",
-        "error",
+    fields = [
+        "scene_id", "title", "scene_index", "status", "quality_tier",
+        "training_caption_draft", "image_path", "image_url", "image_host",
+        "video_path", "video_url", "text_path", "error",
     ]
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
         for row in rows:
-            writer.writerow({key: row.get(key, "") for key in fieldnames})
+            writer.writerow({field: row.get(field, "") for field in fields})
 
 
-def write_scene_log(scene_id, payload):
+def write_log(scene_id, payload):
     path = LOGS_DIR / f"{scene_id}.json"
     path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
     return path
@@ -68,123 +52,114 @@ def write_scene_log(scene_id, payload):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--target-successes", type=int, default=60)
-    parser.add_argument("--max-attempts", type=int, default=90)
+    parser.add_argument("--start-index", type=int, default=1)
+    parser.add_argument("--attempt-count", type=int, default=10)
     parser.add_argument("--pause-seconds", type=int, default=20)
+    parser.add_argument("--stop-after-total-failures", type=int, default=5)
+    parser.add_argument("--stop-after-consecutive-failures", type=int, default=3)
+    parser.add_argument("--output-tag", default="batch_01")
     args = parser.parse_args()
 
-    ensure_all_dirs()
+    ensure_dirs()
     scenes = build_scenes()
+    start = max(1, args.start_index)
+    end = min(len(scenes), start + max(1, args.attempt_count) - 1)
+    selected = list(enumerate(scenes[start - 1:end], start=start))
 
-    manifest_rows = []
-    manifest_json = MANIFESTS_DIR / "production_sweep_01_manifest.json"
-    manifest_csv = MANIFESTS_DIR / "production_sweep_01_manifest.csv"
+    rows = []
+    manifest_json = MANIFESTS_DIR / f"{args.output_tag}_manifest.json"
+    manifest_csv = MANIFESTS_DIR / f"{args.output_tag}_manifest.csv"
+    summary_json = MANIFESTS_DIR / f"{args.output_tag}_summary.json"
 
-    attempts = 0
     successes = 0
     failures = 0
+    consecutive_failures = 0
+    stop_reason = "batch_completed"
 
-    for scene in scenes:
-        if attempts >= args.max_attempts or successes >= args.target_successes:
-            break
-
-        attempts += 1
+    for position, (scene_index, scene) in enumerate(selected, start=1):
         scene_id = scene["scene_id"]
-        print(f"=== Production attempt {attempts}/{args.max_attempts}: {scene_id} ===")
-
+        print(f"=== Batch attempt {position}/{len(selected)}: scene {scene_index} {scene_id} ===")
         row = {
             "scene_id": scene_id,
             "title": scene.get("title", scene_id),
-            "attempt_number": attempts,
+            "scene_index": scene_index,
             "status": "started",
             "quality_tier": "draft_success",
-            "training_caption_draft": scene.get(
-                "training_caption_draft", scene.get("title", scene_id)
-            ),
+            "training_caption_draft": scene.get("training_caption_draft", scene.get("title", scene_id)),
         }
-        log_payload = {"scene": scene, "status": "started"}
+        log = {"scene": scene, "scene_index": scene_index, "status": "started"}
 
         try:
             image_path, hf_result = pipeline.generate_image(scene)
             row["image_path"] = str(image_path)
-            log_payload["image_path"] = str(image_path)
-            log_payload["hf_result"] = hf_result
-            print(f"Image saved: {image_path}")
+            log["image_path"] = str(image_path)
+            log["hf_result"] = hf_result
 
             image_url, image_host = pipeline.upload_image(image_path, scene_id)
             row["image_url"] = image_url
             row["image_host"] = image_host
-            log_payload["image_url"] = image_url
-            log_payload["image_host"] = image_host
-            print(f"Image available through {image_host}: {image_url}")
+            log["image_url"] = image_url
+            log["image_host"] = image_host
 
             task_id, creation_response = create_paid_hailuo_task(scene, image_url)
-            log_payload["task_id"] = task_id
-            log_payload["creation_response"] = creation_response
-            print(f"Hailuo task created: {task_id}")
+            log["task_id"] = task_id
+            log["creation_response"] = creation_response
 
             task_response = pipeline.poll_hailuo_task(task_id)
-            log_payload["task_response"] = task_response
-
+            log["task_response"] = task_response
             video_path, video_url = pipeline.download_video(task_response, scene_id)
             row["video_path"] = str(video_path)
             row["video_url"] = video_url
-            log_payload["video_path"] = str(video_path)
-            log_payload["video_url"] = video_url
-            print(f"Video saved: {video_path}")
+            log["video_path"] = str(video_path)
+            log["video_url"] = video_url
 
             text_path = TRAINING_TEXTS_DIR / f"{scene_id}.txt"
-            text_path.write_text(
-                row["training_caption_draft"].strip() + "\n", encoding="utf-8"
-            )
+            text_path.write_text(row["training_caption_draft"].strip() + "\n", encoding="utf-8")
             row["text_path"] = str(text_path)
-
             shutil.copy2(video_path, TRAINING_VIDEOS_DIR / video_path.name)
             shutil.copy2(image_path, TRAINING_STILLS_DIR / image_path.name)
 
             row["status"] = "success"
-            log_payload["status"] = "success"
+            log["status"] = "success"
             successes += 1
+            consecutive_failures = 0
         except Exception as exc:
             failures += 1
+            consecutive_failures += 1
             row["status"] = "failed"
             row["quality_tier"] = "failed_generation"
             row["error"] = str(exc)
-            log_payload["status"] = "failed"
-            log_payload["error"] = str(exc)
+            log["status"] = "failed"
+            log["error"] = str(exc)
             print(f"{scene_id} failed: {exc}")
         finally:
-            log_path = write_scene_log(scene_id, log_payload)
-            row["log_path"] = str(log_path)
-            manifest_rows.append(row)
-            save_manifest(manifest_rows, manifest_json, manifest_csv)
+            row["log_path"] = str(write_log(scene_id, log))
+            rows.append(row)
+            save_manifest(rows, manifest_json, manifest_csv)
 
-        if (
-            attempts < args.max_attempts
-            and successes < args.target_successes
-            and attempts < len(scenes)
-        ):
-            print(f"Pausing {args.pause_seconds} seconds before the next attempt...")
+        if failures >= args.stop_after_total_failures:
+            stop_reason = "total_failure_limit_reached"
+            break
+        if consecutive_failures >= args.stop_after_consecutive_failures:
+            stop_reason = "consecutive_failure_limit_reached"
+            break
+        if position < len(selected):
             time.sleep(args.pause_seconds)
 
     summary = {
-        "target_successes": args.target_successes,
-        "max_attempts": args.max_attempts,
-        "attempts_completed": attempts,
+        "output_tag": args.output_tag,
+        "start_index": start,
+        "requested_attempts": args.attempt_count,
+        "attempts_completed": len(rows),
         "successes": successes,
         "failures": failures,
-        "stopped_reason": (
-            "target_reached"
-            if successes >= args.target_successes
-            else "max_attempts_or_scene_list_exhausted"
-        ),
-        "training_upload_dir": str(TRAINING_DIR),
+        "consecutive_failures_at_end": consecutive_failures,
+        "next_start_index": start + len(rows),
+        "stop_reason": stop_reason,
         "manifest_json": str(manifest_json),
         "manifest_csv": str(manifest_csv),
     }
-    (MANIFESTS_DIR / "production_sweep_01_summary.json").write_text(
-        json.dumps(summary, indent=2), encoding="utf-8"
-    )
+    summary_json.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(json.dumps(summary, indent=2))
 
 
