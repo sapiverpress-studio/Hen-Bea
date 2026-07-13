@@ -1,0 +1,262 @@
+name: Export Complete Hen & Bea Training Dataset
+
+on:
+  push:
+    paths:
+      - .github/workflows/export_all_training_dataset.yml
+      - .github/export_all_training.trigger
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  export-dataset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Discover and download all current generation artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          rm -rf dataset_work dataset_export
+          mkdir -p dataset_work/zips dataset_export/original_artifacts
+          mkdir -p dataset_export/training_review/videos dataset_export/training_review/texts dataset_export/training_review/stills
+          mkdir -p dataset_export/repository_materials
+
+          page=1
+          : > dataset_work/artifacts.jsonl
+          while true; do
+            response=$(curl -fsSL \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPOSITORY}/actions/artifacts?per_page=100&page=${page}")
+            count=$(echo "$response" | jq '.artifacts | length')
+            echo "$response" | jq -c '.artifacts[]' >> dataset_work/artifacts.jsonl
+            [ "$count" -lt 100 ] && break
+            page=$((page + 1))
+          done
+
+          jq -s '
+            map(select(.expired == false))
+            | map(select(
+                (.name | startswith("hen-bea-batch-")) or
+                (.name | startswith("hen-bea-production-sweep")) or
+                (.name | startswith("hen-bea-pilot"))
+              ))
+            | sort_by(.name, .created_at)
+            | group_by(.name)
+            | map(last)
+            | sort_by(.created_at)
+          ' dataset_work/artifacts.jsonl > dataset_work/selected_artifacts.json
+
+          selected=$(jq 'length' dataset_work/selected_artifacts.json)
+          echo "Selected ${selected} current artifacts."
+          if [ "$selected" -eq 0 ]; then
+            echo "No matching non-expired generation artifacts were found." >&2
+            exit 1
+          fi
+
+          jq -r '.[] | [.id, .name, .created_at] | @tsv' dataset_work/selected_artifacts.json |
+          while IFS=$'\t' read -r artifact_id artifact_name created_at; do
+            safe_name=$(printf '%s' "$artifact_name" | tr -cs 'A-Za-z0-9._-' '_')
+            echo "Downloading ${artifact_name} (${artifact_id})"
+            curl -fsSL -L \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPOSITORY}/actions/artifacts/${artifact_id}/zip" \
+              -o "dataset_work/zips/${safe_name}.zip"
+            mkdir -p "dataset_export/original_artifacts/${safe_name}"
+            unzip -q "dataset_work/zips/${safe_name}.zip" -d "dataset_export/original_artifacts/${safe_name}"
+            printf '%s\t%s\t%s\n' "$artifact_id" "$artifact_name" "$created_at" >> dataset_work/downloaded.tsv
+          done
+
+          if [ -d generated-inputs ]; then
+            cp -R generated-inputs dataset_export/repository_materials/generated-inputs
+          fi
+          for path in scripts .github/workflows; do
+            if [ -d "$path" ]; then
+              mkdir -p "dataset_export/repository_materials/$(dirname "$path")"
+              cp -R "$path" "dataset_export/repository_materials/$path"
+            fi
+          done
+
+      - name: Build paired review dataset and manifests
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import csv
+          import hashlib
+          import json
+          import shutil
+          from pathlib import Path
+
+          root = Path('dataset_export')
+          originals = root / 'original_artifacts'
+          review = root / 'training_review'
+          videos_out = review / 'videos'
+          texts_out = review / 'texts'
+          stills_out = review / 'stills'
+
+          def sha256(path: Path) -> str:
+              h = hashlib.sha256()
+              with path.open('rb') as f:
+                  for chunk in iter(lambda: f.read(1024 * 1024), b''):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          rows = []
+          seen_video_hashes = set()
+
+          for artifact_dir in sorted(p for p in originals.iterdir() if p.is_dir()):
+              artifact = artifact_dir.name
+              video_candidates = sorted(artifact_dir.rglob('*.mp4'))
+
+              for video in video_candidates:
+                  # Ignore duplicate convenience copies when the artifact contains
+                  # a canonical training_upload/videos version.
+                  canonical = 'training_upload/videos' in video.as_posix()
+                  digest = sha256(video)
+                  if digest in seen_video_hashes:
+                      continue
+                  seen_video_hashes.add(digest)
+
+                  scene_id = video.stem
+                  prefix = f'{artifact}__{scene_id}'
+
+                  text_matches = [p for p in artifact_dir.rglob(f'{scene_id}.txt') if p.is_file()]
+                  still_matches = [p for p in artifact_dir.rglob(f'{scene_id}.png') if p.is_file()]
+
+                  text = text_matches[0] if text_matches else None
+                  # Prefer training_upload/stills, then any same-name PNG.
+                  still = next((p for p in still_matches if 'training_upload/stills' in p.as_posix()), None)
+                  if still is None and still_matches:
+                      still = still_matches[0]
+
+                  video_dest = videos_out / f'{prefix}.mp4'
+                  shutil.copy2(video, video_dest)
+
+                  text_dest = None
+                  if text:
+                      text_dest = texts_out / f'{prefix}.txt'
+                      shutil.copy2(text, text_dest)
+
+                  still_dest = None
+                  if still:
+                      still_dest = stills_out / f'{prefix}.png'
+                      shutil.copy2(still, still_dest)
+
+                  rows.append({
+                      'source_artifact': artifact,
+                      'scene_id': scene_id,
+                      'video_file': video_dest.relative_to(root).as_posix(),
+                      'text_file': text_dest.relative_to(root).as_posix() if text_dest else '',
+                      'still_file': still_dest.relative_to(root).as_posix() if still_dest else '',
+                      'has_video': True,
+                      'has_text': bool(text_dest),
+                      'has_still': bool(still_dest),
+                      'caption_status': 'draft_needs_visual_verification' if text_dest else 'missing',
+                      'training_status': 'hold_for_review',
+                      'video_sha256': digest,
+                      'canonical_training_copy': canonical,
+                  })
+
+          manifest_csv = review / 'dataset_manifest.csv'
+          fieldnames = list(rows[0].keys()) if rows else [
+              'source_artifact','scene_id','video_file','text_file','still_file',
+              'has_video','has_text','has_still','caption_status','training_status',
+              'video_sha256','canonical_training_copy'
+          ]
+          with manifest_csv.open('w', newline='', encoding='utf-8') as f:
+              writer = csv.DictWriter(f, fieldnames=fieldnames)
+              writer.writeheader()
+              writer.writerows(rows)
+
+          (review / 'dataset_manifest.json').write_text(
+              json.dumps(rows, indent=2), encoding='utf-8'
+          )
+
+          summary = {
+              'unique_videos': len(rows),
+              'paired_video_text': sum(1 for r in rows if r['has_text']),
+              'paired_video_text_still': sum(1 for r in rows if r['has_text'] and r['has_still']),
+              'missing_text': sum(1 for r in rows if not r['has_text']),
+              'missing_still': sum(1 for r in rows if not r['has_still']),
+              'caption_status': 'All copied TXT captions remain generation-intent drafts until checked against rendered footage.',
+              'recommended_next_step': 'Review each MP4, correct its TXT to describe visible reality, then change training_status to accept or reject.',
+          }
+          (review / 'dataset_summary.json').write_text(
+              json.dumps(summary, indent=2), encoding='utf-8'
+          )
+
+          readme = f'''HEN & BEA COMPLETE TRAINING DATASET — REVIEW BUILD
+
+Unique MP4 files: {summary['unique_videos']}
+MP4 + TXT pairs: {summary['paired_video_text']}
+MP4 + TXT + still sets: {summary['paired_video_text_still']}
+
+FOLDER STRUCTURE
+- videos/  Unique rendered MP4 clips.
+- texts/   Matching generation-caption drafts where available.
+- stills/  Matching source stills where available.
+- dataset_manifest.csv / .json  File-by-file review register.
+
+IMPORTANT
+These captions describe intended generation prompts and are not guaranteed to
+match the rendered motion. Do not train directly from this review build without
+watching each video and truth-labelling its TXT file.
+
+Use training_status values such as:
+- accept
+- accept_relabelled
+- trim_then_accept
+- reject
+
+Keep character identity and visible action factual. Role reversals or simplified
+motion can be accepted when visually usable, but the caption must describe what
+actually appears.
+'''
+          (review / 'README_FIRST.txt').write_text(readme, encoding='utf-8')
+          print(json.dumps(summary, indent=2))
+          PY
+
+      - name: Create master ZIP
+        run: |
+          set -euo pipefail
+          mkdir -p exports
+          rm -f exports/hen-bea-complete-materials-and-training-review.zip
+          cp dataset_work/selected_artifacts.json dataset_export/selected_artifacts.json
+          cp dataset_work/downloaded.tsv dataset_export/downloaded_artifacts.tsv
+          zip -qr exports/hen-bea-complete-materials-and-training-review.zip dataset_export
+          ls -lh exports/hen-bea-complete-materials-and-training-review.zip
+
+      - name: Commit master ZIP
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add exports/hen-bea-complete-materials-and-training-review.zip
+          if git diff --cached --quiet; then
+            echo "Master export is unchanged."
+          else
+            git commit -m "Export complete Hen and Bea training review dataset"
+            git push
+          fi
+
+      - name: Upload master ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hen-bea-complete-materials-and-training-review
+          path: exports/hen-bea-complete-materials-and-training-review.zip
+          if-no-files-found: error
