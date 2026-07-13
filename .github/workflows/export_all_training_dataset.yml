@@ -124,8 +124,6 @@ jobs:
               video_candidates = sorted(artifact_dir.rglob('*.mp4'))
 
               for video in video_candidates:
-                  # Ignore duplicate convenience copies when the artifact contains
-                  # a canonical training_upload/videos version.
                   canonical = 'training_upload/videos' in video.as_posix()
                   digest = sha256(video)
                   if digest in seen_video_hashes:
@@ -139,7 +137,6 @@ jobs:
                   still_matches = [p for p in artifact_dir.rglob(f'{scene_id}.png') if p.is_file()]
 
                   text = text_matches[0] if text_matches else None
-                  # Prefer training_upload/stills, then any same-name PNG.
                   still = next((p for p in still_matches if 'training_upload/stills' in p.as_posix()), None)
                   if still is None and still_matches:
                       still = still_matches[0]
@@ -260,3 +257,5 @@ actually appears.
           name: hen-bea-complete-materials-and-training-review
           path: exports/hen-bea-complete-materials-and-training-review.zip
           if-no-files-found: error
+
+# Forced run marker: 2026-07-13
